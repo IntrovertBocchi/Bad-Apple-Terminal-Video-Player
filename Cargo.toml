@@ -1,0 +1,10 @@
+[package]
+name = "badapple_player"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ffmpeg-sidecar = "1"
+image = "0.25"
+crossterm = "0.28"
+rodio = "0.20"
