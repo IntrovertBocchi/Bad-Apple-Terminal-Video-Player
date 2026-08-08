@@ -5,7 +5,7 @@ use crossterm::{
 };
 use std::io::{stdout, Write};
 
-pub fn render_frame(grey_frame: &image::GrayImage) {
+pub fn render_frame(grey_frame: &image::GrayImage, threshold: u8) {
     let (width, height) = grey_frame.dimensions();
     let mut stdout = stdout();
 
@@ -17,8 +17,8 @@ pub fn render_frame(grey_frame: &image::GrayImage) {
             let top_pixel = grey_frame.get_pixel(x, y)[0];
             let bottom_pixel = grey_frame.get_pixel(x, y + 1)[0];
 
-            let top_color = if top_pixel > 128 { Color::White } else { Color::Black };
-            let bottom_color = if bottom_pixel > 128 { Color:: White } else { Color::Black };
+            let top_color = if top_pixel > threshold { Color::White } else { Color::Black };
+            let bottom_color = if bottom_pixel > threshold { Color::White } else { Color::Black };
 
             queue!(
                 stdout,
