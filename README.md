@@ -5,9 +5,23 @@
 > *"Does your terminal play music videos in 30fps black-and-white Unicode blocks, synced to audio, with zero GUI?"*
 > No? Couldn't be me.
 
-A Rust program that plays video **entirely inside a terminal window**, rendered as `▀` half-block Unicode characters, with fully synchronised audio. Started as a Bad Apple!! player. Now plays *basically anything* — Initial D, Bocchi the Rock!, whatever you've got — as an adaptive black-and-white terminal silhouette. No window, no GPU renderer, no Electron, no shame.
+A Rust program that plays video entirely inside a terminal window — synced audio, zero GUI, zero shame. Started as a Bad Apple!! player rendering ▀ half-block silhouettes. Now plays basically anything — Initial D, Bocchi the Rock!, whatever you've got — in your choice of black-and-white silhouette or full 24-bit colour, at your choice of four escalating levels of Unicode block resolution (half, quad, sextant, octant), because apparently one working version was never going to be enough.
 
 ![insert "is this a pigeon" meme but the pigeon is a terminal and the butterfly is labeled "video playback"](docs/memes/pigeon-meme-placeholder.png)
+
+---
+
+## Wait, How Is This Even Possible?
+
+*(For anyone who just watched a full-colour video play inside a black CMD window and needs a second to process that.)*
+
+Terminals have technically been able to display real colour for years — programmers just mostly never pointed that ability at anything except plain text. This project basically hijacks it.
+
+Here's the trick: every tiny square on a terminal screen is normally reserved for one letter. But nothing's stopping you from telling that square "don't show a letter — just *be* this exact colour" instead. Do that to thousands of tiny squares, all at once, 30 times a second, in sync with the audio, and your eye stops seeing "a grid of coloured squares" and starts reading it as a moving picture — the same way a TV is secretly just a grid of tiny coloured dots too.
+
+Think of it like paint-by-numbers, but the "canvas" is a typewriter, and the typewriter can also change colour and is doing it fast enough to look smooth. There's no video player involved anywhere in this. No window, no player app, nothing designed for this. That's kind of the whole point.
+
+And here's the part worth sitting with for a second: **CMD is one of the oldest, plainest pieces of software still shipping on modern computers.** It was never built for graphics, animation, or anything remotely like this — it was built to show you file listings. Getting it to play a full-colour, audio-synced music video isn't a feature anyone added; it's a byproduct of the fact that "change this square's colour" was always technically *possible*, just never really *used*. This project didn't find a shortcut — it just took a 40-year-old tool completely seriously and pushed it somewhere it was never supposed to go. That's the whole appeal, really: not that it's clever, but that it's using the oldest, most boring window on your computer to do something it was never designed to do, at all.
 
 ---
 
