@@ -93,11 +93,19 @@ Each of these was built and fully tested before the next one started. No skippin
 
   Short version: Otsu decides *where* the line is, occasionally, in bursts. Dithering decides *how* to live with that line, constantly, smoothly. One is a sprinter, one is a jogger, and the jogger looks better on camera.
 
+- **Why colour mode can look like it's "vibrating" on faces even though the motion itself is buttery smooth.** These are two completely separate systems, and it really shows once you notice it:
+
+  Motion smoothness is handled entirely by the sync loop — it's comparing real timestamps against real elapsed time, 30 times a second, and it doesn't care what's *inside* a frame at all. That part's rock solid regardless of mode.
+
+  The vibrating texture is a different problem entirely, and it's specific to quad/sextant/octant colour mode's clustering trick. Every character cell independently decides, fresh, from scratch, every single frame, which of its handful of sample pixels count as "the light half" versus "the dark half" of that one tiny block — with zero memory of what it decided one frame ago. On a flat-coloured background that's a stable, easy call every time. But a face has *subtle*, closely-bunched shading — pixels that are almost, but not quite, the same brightness, sitting right on the edge of that block's own light/dark split. Real video has a small amount of natural frame-to-frame noise (compression artifacts, tiny lighting shifts) even when nothing's actually moving — and that's enough to occasionally nudge one of those borderline pixels across the line, flipping which group it lands in. When that happens, the cell's foreground/background colour shifts slightly, for exactly one frame, then flips back. Do that across dozens of borderline cells on a face, 30 times a second, and it reads as a shimmer or vibration — even though the face itself hasn't moved an inch.
+
+  It's the same root cause as dithering's "controlled scribble," just happening in *time* instead of *space* — noise nudging borderline pixels back and forth, except here it's frame-to-frame instead of pixel-to-pixel. Nothing's broken; the motion you're tracking is smooth because that's a completely different, unrelated system doing its job correctly. It's specifically fine-detail *texture* that's a little jittery, and it's most visible exactly where you'd expect — skin, soft shading, anywhere the source image doesn't hand each block a clean, confident answer.
+
 ---
 
-## The Curious case of *Rick Astley* in Explaining Otsu and Floyd-Steinberg Dithering
+## The Curious Case of *Rick Astley* in Explaining Otsu and Floyd–Steinberg Dithering
 
-![side-by-side comparison gif of Never Gonna Give You Up — Left: source video, Middle: Floyd–Steinberg dithering keeping pace and detail, Right: Otsu's method visibly lagging a beat behind before it catches up](docs/memes/rickroll-comparison-placeholder.gif)
+![side-by-side comparison gif of Never Gonna Give You Up — left: source video, middle: Floyd–Steinberg dithering keeping pace and detail, right: Otsu's method visibly lagging a beat behind before it catches up](docs/memes/rickroll-comparison-placeholder.gif)
 
 Forget the code for a second. Imagine you've got a music video — let's say, purely hypothetically, [a certain 1987 song](https://www.youtube.com/watch?v=dQw4w9WgXcQ) — and your only art supplies are a black marker and a white piece of paper. No grey. No shading. You have to redraw every single frame of Rick Astley using only solid black and solid white shapes, fast enough to keep up with the song. That's the entire challenge our program is solving, 30 times a second.
 
@@ -113,18 +121,50 @@ There are two ways to approach this, and they're the two modes you can switch be
 
 So yes: this project is, underneath the terminal blocks and the memes, quietly running the same math that powers mobile check deposits and 1980s newspaper printing, in service of watching a man get rickrolled in ANSI.
 
+---
+
+## Why We Added Colour (A Confession)
+
+Let's be honest about what happened here. The entire *premise* of this project — the whole bit — was "black and white silhouette, on brand for Bad Apple, terminal purity, no cheating." That was a real design decision, written down, with reasons. And then one day the question became "hey, since we can already play *any* video now… could it also just… have colour?"
+
+The correct answer was "no, that defeats the entire aesthetic." The actual answer was "let's find out."
+
+So: full 24-bit truecolor rendering, straight through the same half-block terminal trick, no compromises. Why? Because it looks **cooler**, obviously. Somewhere between "get Rust to draw video in a terminal" and "personally clock how many milliseconds it costs PowerShell's console host to paint an RGB escape code," this project quietly stopped being about Bad Apple and became about **how far the bit could go before physics said no.** That's not scope creep, that's scope *sprint*. There's a difference. We're choosing to believe there's a difference.
+
+![insert "galaxy brain" meme escalating from a plain grey terminal → half-block silhouette → full colour → someone gesturing at a laptop screaming "IT'S JUST RECTANGLES, WHY IS THIS SO PRETTY"](docs/memes/colour-galaxy-brain-placeholder.png)
+
+## The Resolution Arms Race: Half → Quad → Sextant → Octant
+
+Once colour was in, "blocky" suddenly became very visible in a way it never was in black-and-white mode — a silhouette can get away with jagged edges; a face gradient cannot. So naturally, the only sane response was to escalate the actual pixel density per character cell four separate times, each one chasing diminishing returns a little further down a hole that Unicode itself only recently finished digging.
+
+| Style | Pixels per cell | What it actually buys you |
+|---|---|---|
+| **Half-block** `▀` | 1×2 | Where we started. Good enough for Bad Apple. Not good enough once we let colour in the building. |
+| **Quadrant** `▘▝▖▗` etc. | 2×2 | Doubled horizontal detail. Character faces stop looking like Minecraft. Foreground/background now has to average a *cluster* of real pixels instead of just reading one — the first hint we were trading colour fidelity for shape. |
+| **Sextant** `🬀🬁🬂` etc. | 2×3 | A genuinely new-ish Unicode block (2020), meaning older terminals may just render `▯` boxes at you. Six real pixels crammed into 2 output colours. Getting sharper, getting harder to keep colour-honest. |
+| **Octant** `𜴀𜴁𜴂` etc. | 2×4 | The actual ceiling — went and checked, Unicode does not go higher than this for solid block glyphs. Eight real source pixels, still only 2 colours to represent them with. Sharpest shapes we can draw. Also the blurriest colour averaging of the bunch, because you can't have both — we checked that too. |
+
+The honest pattern, if you follow the table down: **shape detail keeps going up, colour accuracy keeps going down**, every single step. That's not a bug in any one of them — it's the actual, unavoidable tradeoff of representing more real pixels using the same fixed 2-colours-per-cell terminal budget. Half-block colour mode is the most colour-faithful and the blockiest. Octant colour mode is the sharpest silhouette and the most colour-approximated. Nothing in between is free — you're just choosing which axis to be a little bit wrong on.
+
+For black-and-white Otsu/Dither modes, none of this tradeoff exists — there's no colour to blur, so sextant and octant are just straightforwardly, unambiguously sharper with zero downside. Colour mode is the only place this whole table has actual opinions.
+
+![insert side-by-side of the same frame rendered in half-block, quad, sextant, and octant, colour mode, increasingly detailed but with visibly "muddier" colour blending each step to the right](docs/memes/resolution-ladder-placeholder.gif)
+
+---
+
 ## Explicitly *Not* Included
 
 Because scope creep is how side projects die:
 
-- Colour rendering (black & white only — on brand for Bad Apple, a deliberate aesthetic choice for everything else)
-- Quarter-block resolution (half-block only)
 - True background/foreground segmentation or ML-based subject isolation — Otsu + dithering get you a good silhouette, not a rotoscoped one
+- Anything past octant resolution — that's the actual Unicode ceiling for solid block glyphs, there is nowhere higher to go
 - Frame interpolation for smoother-than-source motion
 - Playback controls beyond "Q to quit"
 - A GUI, a window, or anything resembling one
 - Audio visualisation
 - Recording / export functionality
+
+![insert "galactic brain" style meme with genuinely unhinged over-engineered version: "adding a full GUI framework to a project whose entire premise was 'terminal only'"](docs/memes/scope-creep-placeholder.png)
 
 ---
 

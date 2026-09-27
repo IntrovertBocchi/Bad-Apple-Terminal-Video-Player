@@ -101,3 +101,42 @@ pub fn dither(grey_frame: &image::GrayImage, threshold: u8) -> image::GrayImage 
 
     output
 }
+
+// Colour resize
+pub fn resize_color(
+    width: u32,
+    height: u32,
+    rgb_data: Vec<u8>,
+    target_width: u32,
+    target_height: u32,
+) -> image::RgbImage {
+    let rgb_image = image::RgbImage::from_raw(width, height, rgb_data)
+        .expect("frame dimension didn't match pixel data length");
+    
+    let dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+    let resized = dynamic_image.resize_exact(
+        target_width,
+        target_height,
+        image::imageops::FilterType::Lanczos3,
+    );
+
+    resized.into_rgb8()
+}
+
+// Quantize colour
+pub fn quantize_color(rgb_frame: &image::RgbImage, step: u8) -> image::RgbImage {
+    let (width, height) = rgb_frame.dimensions();
+    let mut output = image::RgbImage::new(width, height);
+
+    for (x, y, pixel) in rgb_frame.enumerate_pixels() {
+        let quantized = [
+            (pixel[0] / step) * step,
+            (pixel[1] / step) * step,
+            (pixel[2] / step) * step,
+        ];
+        output.put_pixel(x, y, image::Rgb(quantized));
+    }
+
+    output
+}
